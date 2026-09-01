@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "dev": "vite",
+    "sim": "npx --yes serve village-simulator -p 5177",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
