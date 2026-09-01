@@ -1,0 +1,30 @@
+{
+  "name": "@circaevum/locus",
+  "version": "0.1.0-dev",
+  "description": "Place-centered worldline graphics library. Circaevum Locus 0.1-dev.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Circaevum/locus"
+  }
+}

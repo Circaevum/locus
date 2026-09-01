@@ -1,0 +1,15 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #121214; color: #d8dee6; font: 14px/1.4 "DM Sans", system-ui, sans-serif; }
+header {
+  position: absolute; z-index: 2; left: 12px; top: 10px;
+  display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center;
+}
+h1 { font-size: 16px; font-weight: 500; }
+p { font-size: 12px; color: #9a9990; }
+label { font: 12px ui-monospace, monospace; color: #9a9990; display: flex; gap: 0.4rem; align-items: center; }
+input[type="range"] { width: 180px; accent-color: #c9a227; }
+button {
+  background: #1c1c20; color: #d8dee6; border: 1px solid #2a2a30;
+  border-radius: 6px; padding: 0.2rem 0.6rem; cursor: pointer;
+}
+#stage { position: absolute; inset: 0; }
