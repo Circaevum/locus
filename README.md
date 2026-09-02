@@ -23,7 +23,11 @@ npm test
 npm run dev
 ```
 
-Open http://localhost:5176 — plaza walk, time slider.
+Open http://localhost:5176 — village simulator (live isv.wiki copy).
+
+Plaza (Locus GL sandbox, not the sim): `npm run plaza` → http://localhost:5178
+
+Static serve of the same sim: `npm run sim` → http://localhost:5177
 
 ## API
 
