@@ -1,12 +1,12 @@
 /**
- * ISV Knowledge Base — theme toggle (default: light)
- * Persists to localStorage key "isv-theme"
+ * ISV Knowledge Base — theme toggle (Locus sim default: dark)
+ * Persists to localStorage key "locus-theme"
  */
 (function (global) {
   'use strict';
 
-  var STORAGE_KEY = 'isv-theme';
-  var DEFAULT_THEME = 'light';
+  var STORAGE_KEY = 'locus-theme';
+  var DEFAULT_THEME = 'dark';
 
   function normalize(theme) {
     return theme === 'dark' || theme === 'light' ? theme : DEFAULT_THEME;

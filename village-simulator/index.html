@@ -1,15 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Village Simulator · ISV</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./css/isv-theme.css?v=20260629">
-<link rel="stylesheet" href="./css/meter-focus.css">
-<script src="./js/isv-theme.js"></script>
-<script src="./js/meter-embed.js"></script>
+<link rel="stylesheet" href="./css/isv-theme.css?v=20260903dark">
+<script src="./js/isv-theme.js?v=20260903dark"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
@@ -189,8 +187,24 @@ html[data-role="customer"] .stage { grid-template-columns: 1fr; }
 .panel h2 { font-size: 11px; font-weight: 500; color: var(--text-2); margin: 0 0 0.4rem; border: 0; padding: 0; display: flex; align-items: center; gap: 0.4rem; }
 .panel h2::before { content: ""; width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 .panel-play h2::before { background: #2bb6a3; }
+.panel-geoid h2::before { background: #5c7cfa; }
 .panel-stats h2::before { background: #3b6d11; }
 .panel-log h2::before { background: #c9a227; }
+#wl-geoid-sub { font-size: 11px; color: var(--text-2); margin: 0 0 0.35rem; line-height: 1.35; }
+#wl-geoid-json {
+  margin: 0; max-height: 28vh; overflow: auto;
+  font-family: "DM Mono", ui-monospace, monospace; font-size: 10px; line-height: 1.35;
+  padding: 0.4rem 0.5rem; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); white-space: pre;
+}
+.panel-geoid .wl-geoid-copy,
+.panel-geoid .wl-geoid-file {
+  font-family: inherit; font-size: 10px; padding: 0.12rem 0.4rem;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--bg);
+  color: var(--text-2); cursor: pointer; text-decoration: none;
+}
+.panel-geoid .wl-geoid-file { margin-left: auto; }
+.panel-geoid .wl-geoid-file:hover { color: var(--text); border-color: var(--blue); }
 #wl-stats { display: flex; flex-direction: column; gap: 0.5rem; }
 .stat-hero, .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 .stat {
@@ -379,7 +393,7 @@ html.embed #wl-theater { min-height: calc(100dvh - 0.7rem); flex: 0 0 auto; }
     <button type="button" class="wl-skip" id="wl-rev" title="Play reverse" aria-label="Play reverse">◀</button>
     <select id="wl-viz" aria-label="Time layout" data-ops>
       <option value="v2" selected>v2 · worldlines rise</option>
-      <option value="v1">v1 · rising now-plane</option>
+      <option value="v1">v1 · worldlines drop</option>
     </select>
     <select id="wl-sky" aria-label="Sky">
       <option value="dark" selected>Sky: dark</option>
@@ -508,6 +522,14 @@ html.embed #wl-theater { min-height: calc(100dvh - 0.7rem); flex: 0 0 auto; }
           <div id="wl-houses"></div>
         </div>
       </div>
+      <div class="panel panel-geoid">
+        <h2>Geoid
+          <a class="wl-geoid-file" href="./grid.geojson" title="Full village FeatureCollection">grid.geojson</a>
+          <button type="button" class="wl-geoid-copy" id="wl-geoid-copy" title="Copy this FeatureCollection">copy</button>
+        </h2>
+        <p id="wl-geoid-sub">FeatureCollection · select a feeder or home</p>
+        <pre id="wl-geoid-json">{"type":"FeatureCollection","features":[]}</pre>
+      </div>
       <div class="panel panel-stats">
         <h2>Day totals</h2>
         <div id="wl-stats"></div>
@@ -550,6 +572,6 @@ html.embed #wl-theater { min-height: calc(100dvh - 0.7rem); flex: 0 0 auto; }
   }
 }
 </script>
-<script type="module" src="js/village-worldline-day.js?v=20260901step"></script>
+<script type="module" src="js/village-worldline-day.js?v=20260903rpan"></script>
 </body>
 </html>

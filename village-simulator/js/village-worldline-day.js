@@ -49,7 +49,16 @@ import {
   outageHit,
   rfEdges,
   simulateDay,
-} from "./village-worldline-sim.js?v=20260831thd";
+} from "./village-worldline-sim.js?v=20260903nodummy";
+import { HANG, geoidBlock } from "./geo.js?v=20260903noorigin";
+
+function geoidCollection(features, name = "ISV village schematic") {
+  return {
+    type: "FeatureCollection",
+    name,
+    features,
+  };
+}
 
 const COL = {
   site: 0x3b6d11,
@@ -106,7 +115,7 @@ function v1Top() {
 }
 
 function yWorldAt(t, now) {
-  if (!isV2()) return (t / WINDOW_MIN) * boundH;
+  if (!isV2()) return ((t - now) / WINDOW_MIN) * boundH;
   const age = now - t;
   if (age >= 0) {
     if (age <= WINDOW_MIN) return (age / WINDOW_MIN) * boundH;
@@ -122,7 +131,7 @@ function hopFitK(min, hops, dy) {
   const span = (hops - 1) * dy;
   const base = yWorldAt(min, state.nowMin);
   const top = isV2() ? PAST_TOP - 0.12 : v1Top() + 2;
-  const bot = isV2() ? -SCRUNCH_H + 0.12 : 0.08;
+  const bot = isV2() ? -SCRUNCH_H + 0.12 : yWorldAt(0, state.nowMin) + 0.08;
   const room = base >= 0 ? top - base : base - bot;
   if (span <= 0) return 1;
   if (room <= 0.04) return 0.04 / span;
@@ -184,7 +193,7 @@ function camHome(v2) {
   }
   return {
     pos: [COMPASS.x + 116 * s, Math.max(36, 90 * s), COMPASS.z + 158 * s],
-    look: [COMPASS.x, Math.max(24, yWorldAt(state.nowMin, state.nowMin)), COMPASS.z],
+    look: [COMPASS.x, Math.max(6, boundH * 0.35), COMPASS.z],
   };
 }
 const PV_COL = 0x1a2740;
@@ -417,7 +426,7 @@ for (const e of day.events) {
 for (const r of day.readings) {
   if (r.lastBreathArrived || r.lastBreathReason === "channel") anomalyIds.add(r.houseId);
   if (r.lastBreath && houseIndex[r.houseId] % 11 === 0) anomalyIds.add(r.houseId);
-  if (r.feederOut && houseIndex[r.houseId] < 24) anomalyIds.add(r.houseId);
+  if (r.feederOut) anomalyIds.add(r.houseId);
   if (r.capacity >= 0.8) anomalyIds.add(r.houseId);
   if (r.on && r.pf < PF_POOR) anomalyIds.add(r.houseId);
 }
@@ -496,6 +505,8 @@ const panFwd = new THREE.Vector3();
 const panRight = new THREE.Vector3();
 const orbitOffset = new THREE.Vector3();
 const orbitSpherical = new THREE.Spherical();
+const panDelta = new THREE.Vector3();
+const panAxis = new THREE.Vector3();
 const PAN_SPEED = 42;
 const PAN_X = [-95, 95];
 const PAN_Z = [-80, 100];
@@ -546,7 +557,7 @@ const timeUniforms = {
 
 const Y_WORLD_GLSL = `
 float yWorld(float t) {
-  if (uMode < 0.5) return t / uWindow * uBound;
+  if (uMode < 0.5) return (t - uNow) / uWindow * uBound;
   float age = uNow - t;
   if (age >= 0.0) {
     if (age <= uWindow) return (age / uWindow) * uBound;
@@ -825,6 +836,7 @@ function boot() {
   fillLedger();
   fillStats();
   fillHouses();
+  fillGeoid();
   const startMin = applyQuery();
   applySchemeColors();
   setNow(startMin);
@@ -878,10 +890,10 @@ function syncTimeLayout() {
   clipPlanes[1].constant = v2 ? PAST_TOP + 1.25 : v1Top() + 4;
   if (winBand) winBand.position.y = boundH;
   if (sprWin) sprWin.position.y = boundH + 0.4;
-  if (nowPlane) nowPlane.position.y = v2 ? Y_NOW : yWorldAt(state.nowMin, state.nowMin);
-  if (nowMark) nowMark.position.y = v2 ? 1.35 : yWorldAt(state.nowMin, state.nowMin) + 1.2;
-  const y0 = v2 ? -SCRUNCH_H : 0;
-  const y1 = v2 ? PAST_TOP : v1Top();
+  if (nowPlane) nowPlane.position.y = Y_NOW;
+  if (nowMark) nowMark.position.y = v2 ? 1.35 : 1.2;
+  const y0 = v2 ? -SCRUNCH_H : yWorldAt(0, state.nowMin);
+  const y1 = v2 ? PAST_TOP : yWorldAt(DAY_MIN, state.nowMin);
   for (const line of spineMeshes) {
     const pos = line.geometry.getAttribute("position");
     pos.setY(0, y0);
@@ -898,7 +910,7 @@ function applyVizMode() {
     timeGroup.scale.y = v2 ? -1 : 1;
     timeGroup.position.y = v2 ? yAt(state.nowMin) : 0;
   }
-  clipPlanes[0].constant = v2 ? SCRUNCH_H + 0.08 : 2;
+  clipPlanes[0].constant = v2 ? SCRUNCH_H + 0.08 : v1Top() + 2;
   if (nowPlane) nowPlane.material.opacity = v2 ? 0.07 : 0.16;
   if (winBand) winBand.visible = v2;
   if (pastBand) pastBand.visible = v2;
@@ -909,7 +921,7 @@ function applyVizMode() {
   const winUi = document.getElementById("wl-win");
   if (winUi) {
     winUi.hidden = false;
-    winUi.title = v2 ? "Height of stretch / scrunch boundary" : "Height of the v1 day stack";
+    winUi.title = v2 ? "Height of stretch / scrunch boundary" : "Height of the v1 drop stack";
   }
   const hi = document.getElementById("wl-win-hi");
   const val = document.getElementById("wl-win-val");
@@ -3222,8 +3234,8 @@ function setNow(min) {
   if (timeGroup) timeGroup.position.y = isV2() ? yAt(state.nowMin) : 0;
   timeUniforms.uNow.value = state.nowMin;
   placeSun(state.nowMin);
-  if (nowPlane) nowPlane.position.y = isV2() ? Y_NOW : yWorldAt(state.nowMin, state.nowMin);
-  if (nowMark) nowMark.position.y = isV2() ? 1.35 : yWorldAt(state.nowMin, state.nowMin) + 1.2;
+  if (nowPlane) nowPlane.position.y = Y_NOW;
+  if (nowMark) nowMark.position.y = isV2() ? 1.35 : 1.2;
   restackTimeStack();
   restackLastBreath();
   restackTimeLabels();
@@ -3265,6 +3277,105 @@ function applyVisibility() {
   updateFeederHighlight();
 }
 
+function geoidBlocksForScope(scope) {
+  const s = scope || state.scope || { kind: "village" };
+  const hid = s.kind === "house" ? s.id : s.houseId;
+  if (hid && houseById[hid]) {
+    const h = houseById[hid];
+    return {
+      label: `home ${h.name} · ${h.id}`,
+      blocks: [
+        geoidBlock(h.id, "house", h.x, h.z, HANG.ground, {
+          name: h.name,
+          feederId: h.feederId,
+          boardId: h.boardId,
+          xfmrId: h.xfmrId,
+        }),
+      ],
+    };
+  }
+  const bid = s.kind === "board" ? s.id : s.boardId;
+  if (bid && boardById[bid] && !hid) {
+    const b = boardById[bid];
+    const homes = HOUSES.filter((h) => h.boardId === b.id);
+    return {
+      label: `${b.label} · ${homes.length} meters`,
+      blocks: [
+        geoidBlock(b.id, "ems", b.x, b.z, HANG.ems, { feederId: b.feederId, xfmrId: b.xfmrId }),
+        ...homes.map((h) =>
+          geoidBlock(h.id, "house", h.x, h.z, HANG.ground, { name: h.name, boardId: h.boardId }),
+        ),
+      ],
+    };
+  }
+  if (s.kind === "feeder" && s.id) {
+    const f = FEEDERS.find((x) => x.id === s.id);
+    if (!f) return { label: "feeder missing", blocks: [] };
+    const homes = HOUSES.filter((h) => h.feederId === f.id);
+    const poles = POLES.filter((p) => p.feederId === f.id);
+    const xfmrs = TRANSFORMERS.filter((t) => t.feederId === f.id);
+    const boards = BOARDS.filter((b) => b.feederId === f.id);
+    const dtm = DTMS.find((d) => d.feederId === f.id);
+    const blocks = [
+      geoidBlock(f.id, "feeder", f.x, f.z, HANG.pole, { label: f.label, cluster: f.cluster }),
+    ];
+    if (dtm) blocks.push(geoidBlock(dtm.id, "dtm", dtm.x, dtm.z, HANG.dtm, { label: dtm.label }));
+    poles.forEach((p, i) =>
+      blocks.push(geoidBlock(`${f.id}-pole-${i}`, "pole", p.x, p.z, HANG.pole, { feederId: f.id })),
+    );
+    for (const t of xfmrs) {
+      blocks.push(geoidBlock(t.id, "xfmr", t.x, t.z, HANG.xfmr, { label: t.label, n: t.n }));
+    }
+    for (const b of boards) {
+      blocks.push(geoidBlock(b.id, "ems", b.x, b.z, HANG.ems, { label: b.label, n: b.houseIds.length }));
+    }
+    for (const h of homes) {
+      blocks.push(
+        geoidBlock(h.id, "house", h.x, h.z, HANG.ground, {
+          name: h.name,
+          boardId: h.boardId,
+          xfmrId: h.xfmrId,
+        }),
+      );
+    }
+    return { label: `${f.label} · ${blocks.length} pts`, blocks };
+  }
+  if (s.kind === "station") {
+    const st = STATIONS.find((x) => x.id === s.id) || STATIONS[0];
+    const xf = LANDMARKS.xfmr;
+    const gen = LANDMARKS.gen;
+    return {
+      label: st?.label || "Village station",
+      blocks: [
+        geoidBlock("gen", "gen", gen.x, gen.z, HANG.ground, { label: gen.label }),
+        geoidBlock(st?.id || "st-main", "station", xf.x, xf.z, HANG.xfmr, { label: xf.label }),
+        ...FEEDERS.map((f) => geoidBlock(f.id, "feeder", f.x, f.z, HANG.pole, { label: f.label })),
+      ],
+    };
+  }
+  return {
+    label: "village",
+    blocks: [
+      geoidBlock("gen", "gen", LANDMARKS.gen.x, LANDMARKS.gen.z, HANG.ground, { label: LANDMARKS.gen.label }),
+      geoidBlock("xfmr-main", "station", LANDMARKS.xfmr.x, LANDMARKS.xfmr.z, HANG.xfmr, {
+        label: LANDMARKS.xfmr.label,
+      }),
+    ],
+  };
+}
+
+function fillGeoid() {
+  const sub = document.getElementById("wl-geoid-sub");
+  const pre = document.getElementById("wl-geoid-json");
+  if (!pre) return;
+  const { label, blocks } = geoidBlocksForScope(state.scope);
+  const fc = geoidCollection(blocks, label);
+  if (sub) {
+    sub.textContent = `${label} · ${blocks.length} feature${blocks.length === 1 ? "" : "s"}`;
+  }
+  pre.textContent = JSON.stringify(fc, null, 2);
+}
+
 function normalizeScope(scope) {
   const raw = scope && scope.kind ? { ...scope } : { kind: "village" };
   if (raw.kind === "house") {
@@ -3293,6 +3404,7 @@ function setScope(scope, opts = {}) {
     applyVisibility();
     colorPowerLines();
     fillHouses();
+    fillGeoid();
     return;
   }
   const next = normalizeScope(scope);
@@ -3317,6 +3429,7 @@ function setScope(scope, opts = {}) {
   applyVisibility();
   colorPowerLines();
   fillHouses(true);
+  fillGeoid();
   writeQuery({
     feeder: next.kind === "feeder" ? next.id : "",
     board: state.emsId || "",
@@ -3457,6 +3570,31 @@ function orbitByPixels(dxPx, dyPx) {
   camera.lookAt(controls.target);
 }
 
+/** Right-drag: grab the scene (same feel as OrbitControls pan). */
+function panByPixels(dxPx, dyPx) {
+  if (!camera || !controls || !renderer) return;
+  if (camFly) camFly = null;
+  const h = Math.max(1, renderer.domElement.clientHeight);
+  orbitOffset.copy(camera.position).sub(controls.target);
+  const step = (orbitOffset.length() * Math.tan((camera.fov / 2) * (Math.PI / 180)) * 2) / h;
+  panAxis.setFromMatrixColumn(camera.matrix, 0).multiplyScalar(-dxPx * step);
+  panDelta.copy(panAxis);
+  panAxis.setFromMatrixColumn(camera.matrix, 1).multiplyScalar(dyPx * step);
+  panDelta.add(panAxis);
+  camera.position.add(panDelta);
+  controls.target.add(panDelta);
+  const tx = Math.max(PAN_X[0], Math.min(PAN_X[1], controls.target.x));
+  const tz = Math.max(PAN_Z[0], Math.min(PAN_Z[1], controls.target.z));
+  const cx = tx - controls.target.x;
+  const cz = tz - controls.target.z;
+  if (cx || cz) {
+    controls.target.x = tx;
+    controls.target.z = tz;
+    camera.position.x += cx;
+    camera.position.z += cz;
+  }
+}
+
 function applyPick(clientX, clientY) {
   const scope = scopeAt(clientX, clientY);
   if (state.role === "customer") {
@@ -3469,11 +3607,13 @@ function applyPick(clientX, clientY) {
 
 function onStagePointerDown(ev) {
   abortCamFly();
-  if (ev.pointerType === "mouse" && ev.button !== 0) return;
+  const mouse = ev.pointerType === "mouse";
+  if (mouse && ev.button !== 0 && ev.button !== 2) return;
   if (pickPtr && ev.pointerId !== pickPtr.id) return;
   ev.stopImmediatePropagation();
   pickPtr = {
     id: ev.pointerId,
+    button: ev.button,
     x: ev.clientX,
     y: ev.clientY,
     lx: ev.clientX,
@@ -3489,11 +3629,14 @@ function onStagePointerDown(ev) {
 
 function onStagePointerMove(ev) {
   if (!pickPtr || ev.pointerId !== pickPtr.id) return;
-  const dx = ev.clientX - pickPtr.x;
-  const dy = ev.clientY - pickPtr.y;
-  if (dx * dx + dy * dy >= PICK_DRAG_PX * PICK_DRAG_PX) pickPtr.dragged = true;
+  const ox = ev.clientX - pickPtr.x;
+  const oy = ev.clientY - pickPtr.y;
+  if (ox * ox + oy * oy >= PICK_DRAG_PX * PICK_DRAG_PX) pickPtr.dragged = true;
   if (!pickPtr.dragged) return;
-  orbitByPixels(ev.clientX - pickPtr.lx, ev.clientY - pickPtr.ly);
+  const dx = ev.clientX - pickPtr.lx;
+  const dy = ev.clientY - pickPtr.ly;
+  if (pickPtr.button === 2) panByPixels(dx, dy);
+  else orbitByPixels(dx, dy);
   pickPtr.lx = ev.clientX;
   pickPtr.ly = ev.clientY;
 }
@@ -3507,7 +3650,7 @@ function onStagePointerUp(ev) {
   } catch {
     /* ignore */
   }
-  if (g.dragged) return;
+  if (g.dragged || g.button === 2) return;
   applyPick(g.x, g.y);
 }
 
@@ -3950,9 +4093,7 @@ function fillCustomer() {
   card.hidden = !show;
   if (!show) return;
   if (youEl && !youEl.dataset.ready) {
-    youEl.innerHTML = HOUSES.slice(0, 24)
-      .map((h) => `<option value="${h.id}">${esc(h.name)} · ${esc(h.serial)}</option>`)
-      .join("");
+    youEl.innerHTML = HOUSES.map((h) => `<option value="${h.id}">${esc(h.name)} · ${esc(h.serial)}</option>`).join("");
     youEl.dataset.ready = "1";
   }
   if (youEl) youEl.value = state.you;
@@ -4136,6 +4277,7 @@ function applyRole() {
   }
   applyVisibility();
   fillHouses();
+  fillGeoid();
   writeQuery({ role: state.role, you: state.role === "customer" ? state.you : "" });
 }
 
@@ -4193,6 +4335,11 @@ function applyQuery() {
 
 function bindUi() {
   fillFeederSelect();
+  document.getElementById("wl-geoid-copy")?.addEventListener("click", () => {
+    const pre = document.getElementById("wl-geoid-json");
+    const txt = pre?.textContent || "[]";
+    navigator.clipboard?.writeText(txt);
+  });
   document.getElementById("wl-frame")?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();

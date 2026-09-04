@@ -35,7 +35,7 @@ import {
   STATIONS,
   HOMES_PER_BOARD,
   LEAKS,
-} from "./village-worldline-layout.js?v=20260830pv100";
+} from "./village-worldline-layout.js?v=20260903nodummy";
 
 export {
   BESS,
@@ -348,7 +348,7 @@ function hid(house) {
 
 function loudHouse(house) {
   const i = hid(house);
-  return i < 24 || i % 41 === 0;
+  return i % 41 === 0;
 }
 
 function inWin(min, start, dur) {
@@ -389,8 +389,7 @@ function activityMix(house, min, shed = false) {
     if (house.cookDinner) {
       const dinner = 16 * 60 + 20 + (house.dinnerOff || 0);
       if (inWin(min, dinner, house.dinnerDur || 60)) {
-        let c = house.cookW || (rural ? 150 : 210);
-        if (house.name === "Joseph") c += 120;
+        const c = house.cookW || (rural ? 150 : 210);
         out.cooking = Math.max(out.cooking || 0, Math.round(c));
       }
     }
@@ -402,7 +401,7 @@ function activityMix(house, min, shed = false) {
 
     if (house.pump) {
       const pumpStart = 6 * 60 + 40 + (i % 11) * 25;
-      if (inWin(min, pumpStart, 18 + (i % 3) * 8)) out.pump = house.name === "Peter" ? 220 : 110 + (i % 5) * 18;
+      if (inWin(min, pumpStart, 18 + (i % 3) * 8)) out.pump = 110 + (i % 5) * 18;
     }
 
     if (house.ag) {

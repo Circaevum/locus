@@ -1,6 +1,6 @@
 /**
  * IEEE Smart Village — shared theme tokens & chrome
- * Default: light. Toggle via js/isv-theme.js → html[data-theme="light"|"dark"]
+ * Locus sim default: dark. Toggle via js/isv-theme.js → html[data-theme="light"|"dark"]
  */
 
 /* ── Light (default) ── */

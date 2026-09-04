@@ -1,7 +1,7 @@
 /**
  * Procedural village footprint. Default ~1000 homes.
  * Topology: ~10 homes / MeshEMS board, ~10 boards / feeder (~100 customers).
- * `?homes=N` or `window.WL_SIZE` override. Core 24 stay named anchors.
+ * `?homes=N` or `window.WL_SIZE` override. All sites are procedural.
  */
 
 export const PEOPLE_PER_HOME = 5;
@@ -35,13 +35,6 @@ const PROFILES = [
   { nightW: 22, dayW: 85, eveW: 170, loadLimitW: 240, nightLoad: "lighting", dayLoad: "lighting", eveLoad: "cooking" },
 ];
 
-const CORE_NAMES = [
-  "Amina", "Joseph", "Grace", "Peter", "Sarah", "David",
-  "Kwame", "Fatima", "Ibrahim", "Chika", "Omar", "Lila",
-  "Yusuf", "Nia", "Bongani", "Asha", "Tariq", "Mariam",
-  "Kofi", "Zara", "Samuel", "Hana", "Idris", "Palesa",
-];
-
 const GIVEN = [
   "Leila", "Musa", "Hope", "Daniel", "Ayo", "Ruth", "Eshe", "Tomas", "Winta", "Juma",
   "Sanaa", "Abel", "Farah", "Kojo", "Dina", "Issa", "Makeda", "Ravi", "Noor", "Taye",
@@ -66,33 +59,6 @@ export const MAIN_GEN = { x: -26.0, z: -11.0 };
 
 /** Filled by buildSites: feeder heads + board poles. */
 const FEEDER_SPECS = [];
-
-const CORE_SITES = [
-  [-5.0, 2.4, "market"],
-  [-3.2, 3.2, "market"],
-  [-5.6, 4.0, "market"],
-  [-23.5, 5.2, "west"],
-  [-4.0, 4.6, "market"],
-  [11.2, 0.8, "clinic"],
-  [-24.8, 6.4, "west"],
-  [-1.2, 2.2, "market"],
-  [-21.6, 7.5, "west"],
-  [0.5, 12.0, "south"],
-  [9.4, 1.2, "clinic"],
-  [-6.2, 2.8, "market"],
-  [-13.4, 4.2, "west"],
-  [10.8, -1.4, "clinic"],
-  [5.2, 21.2, "south"],
-  [8.8, -1.0, "clinic"],
-  [21.2, 3.4, "east"],
-  [3.8, 21.8, "south"],
-  [-22.2, 4.8, "west"],
-  [6.4, 21.8, "south"],
-  [22.8, 2.6, "east"],
-  [2.8, 22.4, "south"],
-  [23.2, 5.0, "east"],
-  [21.0, 5.4, "east"],
-];
 
 function mulberry(seed) {
   let x = seed | 0;
@@ -130,30 +96,6 @@ function tryAdd(sites, x, z, minD, cluster) {
   }
   sites.push([x, z, cluster || nearestClusterId(x, z)]);
   return true;
-}
-
-function pickCoreSites(n) {
-  if (n >= CORE_SITES.length) return CORE_SITES.map((s) => s.slice());
-  const order = ["market", "west", "south", "clinic", "east"];
-  const want = Object.fromEntries(order.map((c) => [c, 0]));
-  for (let i = 0; i < n; i++) want[order[i % order.length]] += 1;
-  const out = [];
-  const used = new Set();
-  for (const cl of order) {
-    let need = want[cl];
-    for (let i = 0; i < CORE_SITES.length && need > 0; i++) {
-      if (CORE_SITES[i][2] !== cl || used.has(i)) continue;
-      out.push(CORE_SITES[i].slice());
-      used.add(i);
-      need -= 1;
-    }
-  }
-  for (let i = 0; i < CORE_SITES.length && out.length < n; i++) {
-    if (used.has(i)) continue;
-    out.push(CORE_SITES[i].slice());
-    used.add(i);
-  }
-  return out;
 }
 
 function splitEven(n, k) {
@@ -198,38 +140,9 @@ function placeHomesAround(sites, bx, bz, n, minD, rand, cluster, feederId, board
   }
 }
 
-function tagCoreFeeder(sites) {
-  FEEDER_SPECS.length = 0;
-  for (const s of sites) {
-    s[3] = `f-${s[2]}`;
-    s[4] = 0;
-  }
-  for (const c of CLUSTERS) {
-    const hs = sites.filter((s) => s[2] === c.id);
-    if (!hs.length) continue;
-    const mx = hs.reduce((a, s) => a + s[0], 0) / hs.length;
-    const mz = hs.reduce((a, s) => a + s[1], 0) / hs.length;
-    const id = `f-${c.id}`;
-    FEEDER_SPECS.push({
-      id,
-      cluster: c.id,
-      label: `${c.label} feeder`,
-      x: c.x + (MAIN_XFMR.x - c.x) * 0.28,
-      z: c.z + (MAIN_XFMR.z - c.z) * 0.28,
-      boards: [{ x: mx, z: mz, n: hs.length }],
-    });
-  }
-}
-
 function buildSites() {
   const rand = mulberry(20260813);
   const target = TARGET_HOMES;
-  if (target <= CORE_SITES.length) {
-    const sites = pickCoreSites(target);
-    tagCoreFeeder(sites);
-    return sites;
-  }
-
   FEEDER_SPECS.length = 0;
   const sites = [];
   const homesByCluster = apportion(CLUSTER_WEIGHTS, target);
@@ -280,8 +193,7 @@ function buildSites() {
 }
 
 function houseName(i) {
-  if (i < CORE_NAMES.length) return CORE_NAMES[i];
-  return GIVEN[(i - CORE_NAMES.length) % GIVEN.length];
+  return GIVEN[i % GIVEN.length];
 }
 
 function loadTraits(i, rural) {
@@ -322,43 +234,12 @@ function buildHouses() {
       cluster: site[2],
       feederId: site[3] || `f-${site[2]}`,
       boardIdx: site[4] ?? 0,
-      startCredit: i === 3 ? 80 : 0,
+      startCredit: 0,
       ...p,
       ...loadTraits(i, rural),
-      payments: [{ min: 6 * 60 + 12 + (i % 18) * 9, amount: 480 + (i % 7) * 90 }],
+      loadLimitW: rural ? 180 : 240,
+      payments: [{ min: 6 * 60 + 15 + (i % 22) * 8, amount: rural ? 400 : 640 }],
     };
-    if (i < 24) Object.assign(h, { cookDinner: true, awayDay: false });
-    if (i === 0) Object.assign(h, { loadLimitW: 250, payments: [{ min: 7 * 60 + 15, amount: 1500 }] });
-    if (i === 1) {
-      Object.assign(h, {
-        loadLimitW: 400,
-        payments: [
-          { min: 8 * 60, amount: 350 },
-          { min: 21 * 60 + 10, amount: 800 },
-        ],
-      });
-    }
-    if (i === 2) Object.assign(h, { fridgeW: 58, loadLimitW: 150, payments: [{ min: 6 * 60 + 30, amount: 2000 }] });
-    if (i === 3) Object.assign(h, { pump: true, payments: [{ min: 16 * 60, amount: 600 }] });
-    if (i === 4) Object.assign(h, { loadLimitW: 250, payments: [{ min: 12 * 60, amount: 1000 }] });
-    if (i === 5) {
-      Object.assign(h, {
-        peakW: 500,
-        peakStart: 12 * 60,
-        peakEnd: 16 * 60,
-        peakLoad: "productive",
-        loadLimitW: 550,
-        dayLoad: "productive",
-        tools: true,
-        payments: [{ min: 7 * 60, amount: 300 }],
-      });
-    }
-    if (i >= 24) {
-      Object.assign(h, {
-        loadLimitW: rural ? 180 : 240,
-        payments: [{ min: 6 * 60 + 15 + (i % 22) * 8, amount: rural ? 400 : 640 }],
-      });
-    }
     return h;
   });
 }
@@ -633,8 +514,7 @@ function pickPvHouses() {
   for (const h of HOUSES) {
     const i = Number(String(h.id).replace(/\D/g, "")) || 0;
     const rural = h.cluster === "west" || h.cluster === "south";
-    if (i === 2 || i === 3 || i === 5) ids.push(h.id);
-    else if (h.cluster === "clinic" && i % 6 === 0) ids.push(h.id);
+    if (h.cluster === "clinic" && i % 6 === 0) ids.push(h.id);
     else if (rural && ((h.pump && i % 3 === 0) || i % 16 === 0)) ids.push(h.id);
     else if (h.cluster === "market" && i % 24 === 0) ids.push(h.id);
     else if (h.cluster === "east" && i % 20 === 0) ids.push(h.id);
